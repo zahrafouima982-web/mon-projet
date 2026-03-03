@@ -3,34 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CryptoDash Ultimate - ENSAH</title>
+    <title>CryptoDash Premium - ENSAH</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
+        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #3b82f6; }
         .light-theme { --bg: #f1f5f9; --card: #ffffff; --text: #1e293b; }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; transition: 0.3s; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .controls { display: flex; gap: 10px; }
-        select, button { padding: 10px; border-radius: 8px; border: 1px solid #334155; background: var(--card); color: var(--text); cursor: pointer; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .card { background: var(--card); padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #334155; }
+        .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 30px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; }
+        input, select, button { padding: 12px; border-radius: 10px; border: 1px solid #334155; background: var(--card); color: var(--text); outline: none; }
+        input:focus { border-color: var(--accent); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .card { background: var(--card); padding: 20px; border-radius: 15px; border: 1px solid #334155; transition: transform 0.2s; }
+        .card:hover { transform: translateY(-5px); border-color: var(--accent); }
+        .price { font-size: 1.4rem; font-weight: bold; margin: 10px 0; }
         .chart-container { background: var(--card); padding: 20px; border-radius: 15px; border: 1px solid #334155; height: 400px; }
+        .positive { color: #10b981; } .negative { color: #ef4444; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <div>
-            <h1>CryptoDash Ultimate 🚀</h1>
+            <h1>CryptoDash Premium 🚀</h1>
             <p>Par <strong>Zahra Fouima</strong> - ENSAH Ingénierie</p>
         </div>
         <div class="controls">
-            <button onclick="document.body.classList.toggle('light-theme')">🌓 Mode</button>
+            <input type="text" id="searchInput" placeholder="Rechercher une monnaie..." oninput="filterCards()">
             <select id="currency" onchange="fetchData()">
                 <option value="mad">MAD (DH)</option>
                 <option value="usd">USD ($)</option>
             </select>
-            <button onclick="fetchData()" style="background: #3b82f6; color: white;">🔄 Actualiser</button>
+            <button onclick="fetchData()" style="background: var(--accent); color: white; border: none;">🔄 Actualiser</button>
+            <button onclick="document.body.classList.toggle('light-theme')">🌓 Mode</button>
         </div>
     </div>
 
@@ -42,48 +47,77 @@
 
     <script>
         let myChart;
+        let allCoins = [];
 
         async function fetchData() {
             const currency = document.getElementById('currency').value;
             const symbols = { mad: 'DH', usd: '$' };
             
             try {
-                const response = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=${currency}&ids=bitcoin,ethereum,cardano,solana,ripple`);
-                const data = await response.json();
-
-                // 1. Mise à jour des cartes
-                document.getElementById('container').innerHTML = data.map(coin => `
-                    <div class="card">
-                        <img src="${coin.image}" width="30" style="margin-bottom:10px;">
-                        <div style="font-weight:bold;">${coin.name}</div>
-                        <div style="font-size:1.2rem; margin:5px 0;">${coin.current_price.toLocaleString()} ${symbols[currency]}</div>
-                    </div>
-                `).join('');
-
-                // 2. Mise à jour du graphique
-                const ctx = document.getElementById('myChart').getContext('2d');
-                if (myChart) myChart.destroy();
-
-                myChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: data.map(c => c.name),
-                        datasets: [{
-                            label: `Prix en ${symbols[currency]}`,
-                            data: data.map(c => c.current_price),
-                            backgroundColor: ['#f59e0b', '#6366f1', '#3b82f6', '#14b8a6', '#8b5cf6']
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { labels: { color: '#f8fafc' } } },
-                        scales: { y: { ticks: { color: '#f8fafc' } }, x: { ticks: { color: '#f8fafc' } } }
-                    }
-                });
+                // On récupère 20 monnaies au lieu de 5 pour avoir "toutes les argent"
+                const response = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=${currency}&order=market_cap_desc&per_page=20&sparkline=false`);
+                allCoins = await response.json();
+                displayData(allCoins, symbols[currency]);
+                updateChart(allCoins, symbols[currency]);
             } catch (error) {
                 console.error("Erreur API:", error);
+                document.getElementById('container').innerHTML = "<p class='negative'>Erreur de chargement. Veuillez patienter 2 min.</p>";
             }
+        }
+
+        function displayData(data, symbol) {
+            const container = document.getElementById('container');
+            container.innerHTML = data.map(coin => `
+                <div class="card" data-name="${coin.name.toLowerCase()}">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <img src="${coin.image}" width="35">
+                        <h3 style="margin:0;">${coin.name}</h3>
+                    </div>
+                    <div class="price">${coin.current_price.toLocaleString()} ${symbol}</div>
+                    <div class="${coin.price_change_percentage_24h > 0 ? 'positive' : 'negative'}">
+                        ${coin.price_change_percentage_24h.toFixed(2)}% (24h)
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterCards() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                const name = card.getAttribute('data-name');
+                card.style.display = name.includes(query) ? 'block' : 'none';
+            });
+        }
+
+        function updateChart(data, symbol) {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            if (myChart) myChart.destroy();
+
+            // On affiche les 7 premières pour le graphique pour rester lisible
+            const topData = data.slice(0, 7);
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topData.map(c => c.name),
+                    datasets: [{
+                        label: `Prix en ${symbol}`,
+                        data: topData.map(c => c.current_price),
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                    }
+                }
+            });
         }
 
         fetchData();
