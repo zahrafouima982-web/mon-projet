@@ -50,63 +50,45 @@
         let allCoins = [];
 
         async function fetchData() {
-    const errorElement = document.getElementById('error-message'); // Assure-toi que cet ID existe dans ton HTML
-    
-    try {
-        const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=mad&order=market_cap_desc&per_page=10&page=1&sparkline=false';
-        
-        const response = await fetch(url);
+    const errorElement = document.getElementById('error-message');
+    // On utilise un proxy pour contourner le blocage CORS sans clé API
+    const targetUrl = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=mad&order=market_cap_desc&per_page=10&page=1&sparkline=false';
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
 
-        // Si l'API bloque (Erreur 429 ou CORS), on passe au mode "Démo"
+    try {
+        const response = await fetch(proxyUrl);
+
         if (!response.ok) {
-            throw new Error("Mode Démo activé (API limitée)");
+            throw new Error("Réponse réseau non valide");
         }
 
         const data = await response.json();
-        updateChart(data); // Ta fonction qui dessine le graphique orange
+        updateChart(data);
+
+        // Si on réussit, on cache le message d'erreur s'il existe
+        if (errorElement) errorElement.style.display = 'none';
 
     } catch (error) {
-        console.warn("Utilisation des données de secours :", error.message);
+        console.warn("Mode secours activé :", error.message);
         
-        // DONNÉES DE SECOURS : Pour que ton graphique soit TOUJOURS visible sur LinkedIn
+        // Données de secours pour que ton LinkedIn soit toujours beau
         const fallbackData = [
             { name: "Bitcoin", current_price: 640000 },
             { name: "Ethereum", current_price: 350000 },
-            { name: "Binance", current_price: 5800 }
+            { name: "Binance", current_price: 5800 },
+            { name: "Solana", current_price: 1400 },
+            { name: "Cardano", current_price: 5 }
         ];
-        
+
+        // Correction de l'erreur "null" (Ligne 77) : on vérifie si l'élément existe avant
         if (errorElement) {
-            errorElement.innerText = "Affichage des dernières données enregistrées (Mode hors-ligne)";
+            errorElement.innerText = "Affichage en mode démo (Service indisponible)";
+            errorElement.style.color = "orange";
         }
-        
-        updateChart(fallbackData); 
+
+        updateChart(fallbackData);
     }
 }
-        function displayData(data, symbol) {
-            const container = document.getElementById('container');
-            container.innerHTML = data.map(coin => `
-                <div class="card" data-name="${coin.name.toLowerCase()}">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <img src="${coin.image}" width="35">
-                        <h3 style="margin:0;">${coin.name}</h3>
-                    </div>
-                    <div class="price">${coin.current_price.toLocaleString()} ${symbol}</div>
-                    <div class="${coin.price_change_percentage_24h > 0 ? 'positive' : 'negative'}">
-                        ${coin.price_change_percentage_24h.toFixed(2)}% (24h)
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function filterCards() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            const cards = document.querySelectorAll('.card');
-            cards.forEach(card => {
-                const name = card.getAttribute('data-name');
-                card.style.display = name.includes(query) ? 'block' : 'none';
-            });
-        }
-
         function updateChart(data, symbol) {
             const ctx = document.getElementById('myChart').getContext('2d');
             if (myChart) myChart.destroy();
